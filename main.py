@@ -1,25 +1,25 @@
 
 
-def host():
+def host1(x, simulation_time) -> [Event]:
     pass
 
 @dateclass
 class Event:
-    priority: int
-    is_drop: bool
     created_at: float
-    queue_time: float
-    service_time: float
-
-event_table = [Event]
-#[priority, drop=0/1, created_at, queue_time, service_time]
+    priority: int
+    is_drop: bool = None
+    queue_time: float = None
+    service_time: float = None
 
 
 class Router:
 
-    def __init__(self, processors_num, service_policy):
+    def __init__(self, processors_num, service_policy, y, simulation_time, event_table: [Event]):
         self.processors_num = processors_num
         self.queue = Fifo() if service_policy == "FIFO" else Wrr() if service_policy == "WRR" else Npps()
+        self.event_table = event_table
+        self.y = y
+        self.simulation_time = simulation_time
 
     def arrive_packet(self, packet: tuple):
         self.queue.add(packet)
@@ -30,6 +30,8 @@ class Router:
     def generate_service_time(self):
         pass
 
+    def run(self):
+        pass
 
 class Queue:
 
@@ -67,3 +69,13 @@ class Npps(Queue):
 
     def add(self):
         pass
+
+
+def simulation(PROCESSORS_NUM, SERVICE_POLICY, X, Y, T):
+    event_table = [Event]
+
+    event_table = host1(x=X, simulation_time=T)
+
+    router = Router(event_table=event_table, processors_num=PROCESSORS_NUM, service_policy=SERVICE_POLICY, y=Y, simulation_time=T)
+    router.run()
+    print(event_table)
