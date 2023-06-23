@@ -12,6 +12,13 @@ class Event:
     service_time: float = None
 
 
+@dateclass
+class Processor:
+    free_time: float = 0
+    is_busy: bool = false
+    to_busy: bool = 0
+
+
 class Router:
 
     def __init__(self, processors_num, service_policy, y, simulation_time, event_table: [Event]):
@@ -31,7 +38,10 @@ class Router:
         pass
 
     def run(self):
-        pass
+        time=0
+        processors = [Processor in range(self.processors_num)]
+        while(time<=self.simulation_time):
+            if()
 
 class Queue:
 
