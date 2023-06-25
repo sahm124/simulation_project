@@ -1,9 +1,10 @@
+from dataclasses import dataclass
 
 
 def host1(x, simulation_time) -> [Event]:
     pass
 
-@dateclass
+@dataclass
 class Event:
     created_at: float
     priority: int
@@ -12,10 +13,10 @@ class Event:
     service_time: float = None
 
 
-@dateclass
+@dataclass
 class Processor:
     free_time: float = 0
-    is_busy: bool = false
+    is_busy: bool = False
     to_busy: bool = 0
 
 
@@ -41,7 +42,7 @@ class Router:
         time=0
         processors = [Processor in range(self.processors_num)]
         while(time<=self.simulation_time):
-            if()
+            pass
 
 class Queue:
 
@@ -89,3 +90,31 @@ def simulation(PROCESSORS_NUM, SERVICE_POLICY, X, Y, T):
     router = Router(event_table=event_table, processors_num=PROCESSORS_NUM, service_policy=SERVICE_POLICY, y=Y, simulation_time=T)
     router.run()
     print(event_table)
+
+
+import math
+
+
+class CLCG:
+    def __init__(self, M, a, c, x0):
+        self.M = M
+        self.a = a
+        self.c = c
+        self.x = x0
+
+    def rand(self):
+        self.x = (self.a * self.x + self.c) % self.M
+        return self.x / self.M
+
+
+def exponential_generator(y, M, a, c, x0):
+    clcg = CLCG(M, a, c, x0)
+    while True:
+        u = clcg.rand()  # generate a random number between 0 and 1 using CLCG
+        x = -math.log(1 - u) / y  # apply the Inverse-Transform Technique
+        yield x
+
+gen = exponential_generator(2, 2**31 - 1, 1103515245, 12345, 123456789)
+for i in range(10):
+    x = next(gen)
+    print(x)
