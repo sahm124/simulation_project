@@ -29,7 +29,7 @@ class Router:
 
     def __init__(self, processors_num, service_policy, y, simulation_time, event_table: [Event]):
         self.processors_num = processors_num
-        self.queue = Fifo() if service_policy == "FIFO" else Wrr() if service_policy == "WRR" else Npps()
+        self.queue = Fifo() if service_policy == "FIFO" else Wrr() if service_policy == "WRR" else NPPS()
         self.event_table = event_table
         self.y = y
         self.simulation_time = simulation_time
@@ -51,7 +51,7 @@ class Router:
         min_arrive = self.event_table[0].created_at
         i = 0
         processors = [Processor in range(self.processors_num)]
-        while(time<=self.simulation_time):
+        while (time <= self.simulation_time):
             if processor_availability and process_availability:
                 for processor in processors:
                     if (not processor.is_busy) and (self.queue.not_empty) :
@@ -93,10 +93,6 @@ class Router:
                         if processor.to_busy<miner:
                             miner = processor.to_busy
                 self.queue.update_mean_size(time)
-
-
-
-
 
 
 
@@ -361,10 +357,10 @@ def simulation(PROCESSORS_NUM, SERVICE_POLICY, X, Y, T):
 
     event_table = host1(x=X, simulation_time=T)
 
-    router = Router(event_table=event_table, processors_num=PROCESSORS_NUM, service_policy=SERVICE_POLICY, y=Y, simulation_time=T)
+    router = Router(event_table=event_table, processors_num=PROCESSORS_NUM, service_policy=SERVICE_POLICY, y=Y,
+                    simulation_time=T)
     router.run()
     print(event_table)
-
 
 
 class CLCG:
@@ -382,67 +378,100 @@ class CLCG:
 def exponential_generator(y, M, a, c, x0):
     clcg = CLCG(M, a, c, x0)
     while True:
-        u = clcg.rand()  # generate a random number between 0 and 1 using CLCG
-        x = -math.log(1 - u) / y  # apply the Inverse-Transform Technique
+        u = clcg.rand()
+        x = -math.log(1 - u) / y  # Inverse-Transform Technique
         yield x
 
-def poisson_generator(lam, M, a, c, x0):
+
+def poisson_generator_by_binomial(lam, M, a, c, x0):
     clcg = CLCG(M, a, c, x0)
-    n = 1000  # set the number of trials for the binomial distribution
-    p = lam / n  # set the probability of success for the binomial distribution
+    n = 1000
+    p = lam / n
     while True:
-        u = clcg.rand()  # generate a random number between 0 and 1 using CLCG
-        x = -math.log(1 - u) / lam  # generate an exponential random variable
+        u = clcg.rand()
+        x = -math.log(1 - u) / lam
         y = 0
         for i in range(n):
             if clcg.rand() < p:
                 y += 1
-        if x <= y / p:  # check if x is less than or equal to y/p
+        if x <= y / p:
             yield y
         else:
             continue
 
-def arrival_times(lambda_val, num_events, M=2**32, a=1103515245, c=12345, x0=1):
-    # Generate inter-arrival times using the poisson_generator function
-    inter_arrival_gen = poisson_generator(lambda_val, M, a, c, x0)
-    inter_arrival_times = [next(inter_arrival_gen) for i in range(num_events)]
 
-    # Accumulate the inter-arrival times to get the arrival times
-    arrival_times = [sum(inter_arrival_times[:i+1]) for i in range(num_events)]
-
+def poisson_time_arrival_generator(lam, M, a, c, x0, total_time):
+    exp_gen = exponential_generator(1 / lam, M, a, c, x0)
+    arrival_times = []
+    t = 0
+    while t < total_time:
+        interrval_time = next(exp_gen)
+        t += interrval_time
+        arrival_times.append(t)
     return arrival_times
 
-gen = exponential_generator(2, 2**31 - 1, 2247445469, 12345, 123456789)
-for i in range(10):
-    x = next(gen)
-    print(x)
-z =[]
-gen = CLCG(M=2**31 - 1, a=22474454, c=123456, x0=123456789)
-print("uniform")
-for i in range(10):
-    x = gen.rand()
-    z.append(x)
-    print(x)
 
-import numpy as np
+def priority_packet(M, a, c, x0):
+    clcg = CLCG(M, a, c, x0)
+    while True:
+        u = clcg.rand()
+        if (u <= 0.2) and (u >= 0):
+            yield 1
+        elif u <= 0.5:
+            yield 2
+        elif u <= 1:
+            yield 3
+        else:
+            raise Exception("Not uniform generated")
 
-# Generate some sample data
-
-
-# Calculate the variance of the data
-data_var = np.var(z)
-
-# Calculate the expected variance of a uniform distribution with the same range as the data
-uniform_var = (1/12) * (max(z) - min(z))**2
-
-# Check if the ratio of the actual variance to the expected variance is close to 1
-if abs(data_var / uniform_var - 1) < 0.1:
-    print("The data is likely from a uniform distribution.")
-else:
-    print("The data is not from a uniform distribution.")
-
-poisson_gen = poisson_generator(2.5, M=2**31-1, a=1103515245, c=12345, x0=1)
-
-for i in range(10):
-    x = next(poisson_gen)
-    print(x)
+def host(simulation_time, x, y):
+    M = 2 ** 31 - 1
+    a = 1103515245
+    c = 12345
+    x0 = 1
+    arrival_time = poisson_time_arrival_generator(lam=x, M=M, a=a, c=c, x0=x0, total_time=simulation_time)
+    packet_gen = priority_packet(M=M, a=a, c=c, x0=x0)
+    service_time_gen = exponential_generator(y=y, M=M, a=a, c=c, x0=x0)
+    events = []
+    for arrive in arrival_time:
+        event = Event(
+            created_at=arrive,
+            service_time=next(service_time_gen),
+            priority=next(packet_gen),
+        )
+        events.append(event)
+    return events
+# gen = exponential_generator(2, 2**31 - 1, 2247445469, 12345, 123456789)
+# for i in range(10):
+#     x = next(gen)
+#     print(x)
+# z =[]
+# gen = CLCG(M=2**31 - 1, a=22474454, c=123456, x0=123456789)
+# print("uniform")
+# for i in range(10):
+#     x = gen.rand()
+#     z.append(x)
+#     print(x)
+#
+# import numpy as np
+#
+# # Generate some sample data
+#
+#
+# # Calculate the variance of the data
+# data_var = np.var(z)
+#
+# # Calculate the expected variance of a uniform distribution with the same range as the data
+# uniform_var = (1/12) * (max(z) - min(z))**2
+#
+# # Check if the ratio of the actual variance to the expected variance is close to 1
+# if abs(data_var / uniform_var - 1) < 0.1:
+#     print("The data is likely from a uniform distribution.")
+# else:
+#     print("The data is not from a uniform distribution.")
+#
+# poisson_gen = poisson_generator(2.5, M=2**31-1, a=1103515245, c=12345, x0=1)
+#
+# for i in range(10):
+#     x = next(poisson_gen)
+#     print(x)
