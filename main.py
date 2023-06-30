@@ -88,6 +88,7 @@ class Router:
                 time = min_arrive
                 min_arrive = self.event_table[i+1].created_at
                 i = i+1
+                miner= 1000
                 for processor in processors:
                     if (processor.to_busy < miner) and processor.is_busy:
                         miner = processor.to_busy
@@ -159,10 +160,15 @@ class Fifo(Queue):
         self.q_time = 0.0
 
     def add(self, packet):
-        super().add(packet)
+        if len(self.buffer) < self.limit:
+            self.buffer.append(packet)
+        else:
+            packet.is_drop = True
 
     def call(self):
-        return super().call()
+        if not self.buffer:
+            return None
+        return self.buffer.popleft()
 
     def update_mean_size(self, time):
         self.meaner = self.meaner + ((time - self.q_time)*len(self.buffer))
@@ -197,6 +203,8 @@ class NPPS(Queue):
                 self.q2.append(packet)
             else:
                 self.q3.append(packet)
+        else:
+            packet.is_drop = True
 
     def call(self):
         if len(self.q1)>0:
@@ -252,6 +260,8 @@ class Wrr(Queue):
         elif packet.priority == 3:
             if len(self.q3) < self.limit3:
                 self.q3.append(packet)
+        else:
+            packet.is_drop=True
 
     def call(self):
         if self.remaining == 0 :
@@ -408,9 +418,11 @@ def host(simulation_time, x, y):
 PROCESSORS_NUM = 1
 SERVICE_POLICY = 'NPPS'
 X = 1
-Y = 0.3
-T = 100
-limit1 = 3
-limit2 = 3
-limit3 = 3
+Y = 0.1
+T = 10
+limit1 = 0
+limit2 = 1
+limit3 = 1
 final_event_table = simulation(PROCESSORS_NUM=PROCESSORS_NUM, SERVICE_POLICY=SERVICE_POLICY, X=X, Y=Y, T=T, limit1=limit1,limit2=limit2,limit3=limit3)
+for i in final_event_table:
+    print(i)
