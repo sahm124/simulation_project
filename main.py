@@ -27,9 +27,9 @@ def host1(x, simulation_time) -> [Event]:
 
 class Router:
 
-    def __init__(self, processors_num, service_policy, y, simulation_time, event_table: [Event],limit):
+    def __init__(self, processors_num, service_policy, y, simulation_time, event_table: [Event], limit1, limit2, limit3):
         self.processors_num = processors_num
-        self.queue = Fifo(limit) if service_policy == "FIFO" else Wrr(limit) if service_policy == "WRR" else NPPS(limit)
+        self.queue = Fifo(limit1,limit2,limit3) if service_policy == "FIFO" else Wrr(limit1,limit2,limit3) if service_policy == "WRR" else NPPS(limit1,limit2,limit3)
         self.service_p = service_policy
         self.event_table = event_table
         self.y = y
@@ -64,14 +64,11 @@ class Router:
                 for processor in processors:
                     if self.queue.not_empty():
                         if not processor.is_busy:
-                            timer = self.queue.timer()
                             process_from_queue = self.queue.call()
                             processor.is_busy = True
-                            processor.to_busy = time + timer
-                            process_from_queue.remaining = process_from_queue.remaining - timer
-                            if process_from_queue.remaining == 0:
-                                process_from_queue.is_done = True
-                                process_from_queue.queue_time = time - process_from_queue.created_at
+                            processor.to_busy = time + process_from_queue.service_time
+                            process_from_queue.is_done = True
+                            process_from_queue.queue_time = time - process_from_queue.created_at
                 miner = 1000
                 processor_availability = False
                 for processor in processors:
@@ -154,8 +151,8 @@ class Queue:
 
 
 class Fifo(Queue):
-    def __init__(self, limit):
-        self.limit = limit
+    def __init__(self, limit1, limit2, limit3):
+        self.limit = limit1
         self.buffer = deque()
         self.meaner = 0.0
         self.averege_count = 0.0
@@ -174,9 +171,6 @@ class Fifo(Queue):
     def calculate_averege(self, time):
         self.averege_count = self.meaner/time
 
-    def timer(self):
-        return self.buffer[0].remaining
-
     def not_empty(self):
         if len(self.buffer) != 0:
             return True
@@ -185,8 +179,8 @@ class Fifo(Queue):
 
 
 class NPPS(Queue):
-    def __init__(self, limit):
-        self.limit = limit
+    def __init__(self, limit1, limit2, limit3):
+        self.limit = limit1
         self.buffer = deque()
         self.meaner = 0.0
         self.averege_count = 0.0
@@ -212,14 +206,6 @@ class NPPS(Queue):
         else:
             return self.q3.popleft()
 
-    def timer(self):
-        if len(self.q1) > 0:
-            return self.q1[0].remaining
-        elif len(self.q2) > 0:
-            return self.q2[0].remaining
-        else:
-            return self.q3[0].remaining
-
     def not_empty(self):
         if len(self.q1) > 0:
             return True
@@ -238,8 +224,10 @@ class NPPS(Queue):
 
 
 class Wrr(Queue):
-    def __init__(self, limit):
-        self.limit = limit
+    def __init__(self, limit1, limit2, limit3):
+        self.limit3 = limit3
+        self.limit2 = limit2
+        self.limit1 = limit1
         self.buffer = deque()
         self.meaner1 = 0.0
         self.averege_count1 = 0.0
@@ -252,125 +240,58 @@ class Wrr(Queue):
         self.q2 = deque()
         self.q3 = deque()
         self.which_q = 1
-        self.remaining_time = 3
+        self.remaining = 3
 
     def add(self, packet):
         if packet.priority == 1:
-            if len(self.q1) < self.limit:
+            if len(self.q1) < self.limit1:
                 self.q1.append(packet)
         elif packet.priority == 2:
-            if len(self.q2) < self.limit:
+            if len(self.q2) < self.limit2:
                 self.q2.append(packet)
         elif packet.priority == 3:
-            if len(self.q3) < self.limit:
+            if len(self.q3) < self.limit3:
                 self.q3.append(packet)
 
     def call(self):
+        if self.remaining == 0 :
+          if self.which_q ==1:
+            self.which_q =2
+            self.remaining = 2
+          elif self.which_q ==2:
+            self.which_q =3
+            self.remaining = 1
+          elif self.which_q ==3:
+            self.which_q =1
+            self.remaining = 3
+
         if self.which_q == 1:
             if len(self.q1) > 0:
-                if self.remaining_time >= self.q1[0].remaining:
-                    self.remaining_time = self.remaining_time - self.q1[0].remaining
-                    return self.q1.pop()
-                else :
-                    self.remaining_time = 2
-                    self.which_q = 2
-                    return self.q1[0]
+              self.remaining = self.remaining -1
+              return self.q1.popleft()
             else:
-                self.remaining_time = 2
                 self.which_q = 2
-                return self.call()
+                self.remaining = 2
+                return self.call
 
         elif self.which_q == 2:
             if len(self.q2) > 0:
-                if self.remaining_time >= self.q2[0].remaining:
-                    self.remaining_time = self.remaining_time - self.q2[0].remaining
-                    return self.q2.pop()
-                else:
-                    self.remaining_time = 1
-                    self.which_q = 3
-                    return self.q2[0]
+              self.remaining = self.remaining -1
+              return self.q2.popleft()
             else:
-                self.remaining_time = 1
                 self.which_q = 3
-                return self.call()
+                self.remaining = 1
+                return self.call
 
         elif self.which_q == 3:
             if len(self.q3) > 0:
-                if self.remaining_time >= self.q3[0].remaining:
-                    self.remaining_time = self.remaining_time - self.q3[0].remaining
-                    return self.q3.pop()
-                else:
-                    self.remaining_time = 3
-                    self.which_q = 1
-                    return self.q3[0]
+              self.remaining = self.remaining -1
+              return self.q3.popleft()
             else:
-                self.remaining_time = 3
                 self.which_q = 1
-                return self.call()
+                self.remaining = 3
+                return self.call
 
-
-    def timer(self):
-        if self.remaining_time == 0:
-            if self.which_q ==1:
-                self.which_q ==2
-                self.remaining_time=2
-            elif self.which_q ==2:
-                self.which_q == 3
-                self.remaining_time = 1
-            else:
-                self.which_q == 1
-                self.remaining_time = 3
-
-        if self.which_q == 1:
-            if len(self.q1) > 0:
-                if self.remaining_time >= self.q1[0].remaining:
-                    return self.q1[0].remaining
-                else:
-                    return self.remaining_time
-            elif len(self.q2) > 0:
-                if 2 >= self.q2[0].remaining:
-                    return self.q2[0].remaining
-                else:
-                    return 2
-            elif len(self.q3) > 0:
-                if 1 >= self.q3[0].remaining:
-                    return self.q3[0].remaining
-                else:
-                    return 1
-
-        elif self.which_q == 2:
-            if len(self.q2) > 0:
-                if self.remaining_time >= self.q2[0].remaining:
-                    return self.q2[0].remaining
-                else:
-                    return self.remaining_time
-            elif len(self.q3) > 0:
-                if 1 >= self.q3[0].remaining:
-                    return self.q3[0].remaining
-                else:
-                    return 1
-            elif len(self.q1) > 0:
-                if 3 >= self.q1[0].remaining:
-                    return self.q1[0].remaining
-                else:
-                    return 3
-
-        elif self.which_q == 3:
-            if len(self.q3) > 0:
-                if self.remaining_time >= self.q3[0].remaining:
-                    return self.q3[0].remaining
-                else:
-                    return self.remaining_time
-            elif len(self.q1) > 0:
-                if 3 >= self.q1[0].remaining:
-                    return self.q1[0].remaining
-                else:
-                    return 3
-            elif len(self.q2) > 0:
-                if 2 >= self.q2[0].remaining:
-                    return self.q2[0].remaining
-                else:
-                    return 2
 
     def not_empty(self):
         if len(self.q1) > 0:
@@ -393,18 +314,15 @@ class Wrr(Queue):
         self.averege_count3 = self.meaner3 / time
 
 
-def simulation(PROCESSORS_NUM, SERVICE_POLICY, X, Y, T, limit):
+def simulation(PROCESSORS_NUM, SERVICE_POLICY, X, Y, T, limit1,limit2,limit3):
     event_table = [Event]
     event_table = host(simulation_time=2*T, x=X, y=Y)
-    print(event_table)
 
     router = Router(event_table=event_table, processors_num=PROCESSORS_NUM, service_policy=SERVICE_POLICY, y=Y,
-                    simulation_time=T, limit= limit)
+                    simulation_time=T, limit1= limit1, limit2=limit2, limit3=limit3)
     router.run()
 
-    print(event_table)
-    print('done\n')
-    print(event_table)
+    return event_table
 
 
 class CLCG:
@@ -492,5 +410,7 @@ SERVICE_POLICY = 'NPPS'
 X = 1
 Y = 0.3
 T = 100
-limit = 3
-simulation(PROCESSORS_NUM=PROCESSORS_NUM, SERVICE_POLICY=SERVICE_POLICY, X=X, Y=Y, T=T, limit =10)
+limit1 = 3
+limit2 = 3
+limit3 = 3
+final_event_table = simulation(PROCESSORS_NUM=PROCESSORS_NUM, SERVICE_POLICY=SERVICE_POLICY, X=X, Y=Y, T=T, limit1=limit1,limit2=limit2,limit3=limit3)
