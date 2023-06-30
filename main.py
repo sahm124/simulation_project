@@ -78,7 +78,7 @@ class Router:
                     min_arrive = self.event_table[i].created_at
                 else:
                     i = -1
-            elif min_time_of_processors <= min_arrive:
+            else:
                 for processor in processors:
                     if not processor.is_busy:
                         processor.free_time = processor.free_time + (min_time_of_processors - time)
@@ -86,6 +86,8 @@ class Router:
                     if processor.to_busy == min_time_of_processors:
                         processor.is_busy = False
                 time = min_time_of_processors
+
+
 
 
 
@@ -114,7 +116,7 @@ class Fifo(Queue):
         return super().call()
 
 
-class Wrr(Queue):
+class NPPS(Queue):
     def __init__(self, limit, weights):
         super().__init__(limit)
         self.weights = deque(weights)
@@ -132,7 +134,7 @@ class Wrr(Queue):
         return packet
 
 
-class Npps(Queue):
+class Wrr(Queue):
     def __init__(self, limit):
         super().__init__(limit)
         self.priorities = {1: deque(), 2: deque(), 3: deque()}
