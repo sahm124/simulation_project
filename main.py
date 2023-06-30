@@ -30,6 +30,7 @@ class Router:
     def __init__(self, processors_num, service_policy, y, simulation_time, event_table: [Event],limit):
         self.processors_num = processors_num
         self.queue = Fifo(limit) if service_policy == "FIFO" else Wrr(limit) if service_policy == "WRR" else NPPS(limit)
+        self.service_p = service_policy
         self.event_table = event_table
         self.y = y
         self.simulation_time = simulation_time
@@ -114,6 +115,23 @@ class Router:
                 min_time_of_processors = miner
                 self.queue.update_mean_size(time)
 
+        self.queue.update_mean_size(self.simulation_time)
+        self.queue.calculate_averege(self.simulation_time)
+
+        if self.service_p == "FIFO":
+            print("averge count of the queue is :")
+            print(self.queue.averege_count)
+        elif self.service_p == "WRR":
+            print("averge count of the first queue is :")
+            print(self.queue.averege_count1)
+            print("averge count of the second queue is :")
+            print(self.queue.averege_count2)
+            print("averge count of the third queue is :")
+            print(self.queue.averege_count3)
+        else:
+            print("averge count of the queue is :")
+            print(self.queue.averege_count)
+
 
 
 
@@ -182,9 +200,9 @@ class NPPS(Queue):
             if packet.priority == 1:
                 self.q1.append(packet)
             elif packet.priority == 2:
-                self.q2.append()
+                self.q2.append(packet)
             else:
-                self.q3.append()
+                self.q3.append(packet)
 
     def call(self):
         if len(self.q1)>0:
@@ -211,11 +229,11 @@ class NPPS(Queue):
             return True
         return False
 
-    def update_mean_size(time):
+    def update_mean_size(self, time):
         self.meaner = self.meaner + ((time - self.q_time)*(len(self.q1)+len(self.q2)+len(self.q3)))
         self.q_time = time
 
-    def calculate_averege(time):
+    def calculate_averege(self, time):
         self.averege_count = self.meaner/time
 
 
@@ -242,10 +260,10 @@ class Wrr(Queue):
                 self.q1.append(packet)
         elif packet.priority == 2:
             if len(self.q2) < self.limit:
-                self.q2.append()
+                self.q2.append(packet)
         elif packet.priority == 3:
             if len(self.q3) < self.limit:
-                self.q3.append()
+                self.q3.append(packet)
 
     def call(self):
         if self.which_q == 1:
@@ -315,8 +333,8 @@ class Wrr(Queue):
                 else:
                     return 2
             elif len(self.q3) > 0:
-                if 1 >= self.q2[0].remaining:
-                    return self.q2[0].remaining
+                if 1 >= self.q3[0].remaining:
+                    return self.q3[0].remaining
                 else:
                     return 1
 
@@ -363,13 +381,13 @@ class Wrr(Queue):
             return True
         return False
 
-    def update_mean_size(time):
+    def update_mean_size(self, time):
         self.meaner1 = self.meaner1 + ((time - self.q_time) * (len(self.q1)))
         self.meaner2 = self.meaner2 + ((time - self.q_time) * (len(self.q2)))
         self.meaner3 = self.meaner3 + ((time - self.q_time) * (len(self.q3)))
         self.q_time = time
 
-    def calculate_averege(time):
+    def calculate_averege(self, time):
         self.averege_count1 = self.meaner1 / time
         self.averege_count2 = self.meaner2 / time
         self.averege_count3 = self.meaner3 / time
@@ -383,6 +401,7 @@ def simulation(PROCESSORS_NUM, SERVICE_POLICY, X, Y, T, limit):
     router = Router(event_table=event_table, processors_num=PROCESSORS_NUM, service_policy=SERVICE_POLICY, y=Y,
                     simulation_time=T, limit= limit)
     router.run()
+
     print(event_table)
     print('done\n')
     print(event_table)
@@ -469,7 +488,7 @@ def host(simulation_time, x, y):
         events.append(event)
     return events
 PROCESSORS_NUM = 1
-SERVICE_POLICY = 'FIFO'
+SERVICE_POLICY = 'NPPS'
 X = 1
 Y = 0.3
 T = 100
