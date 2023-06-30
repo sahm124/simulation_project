@@ -29,9 +29,12 @@ def host1(x, simulation_time) -> [Event]:
 
 class Router:
 
-    def __init__(self, processors_num, service_policy, y, simulation_time, event_table: [Event], limit1, limit2, limit3):
+    def __init__(self, processors_num, service_policy, y, simulation_time, event_table: [Event], limit1, limit2,
+                 limit3):
         self.processors_num = processors_num
-        self.queue = Fifo(limit1,limit2,limit3) if service_policy == "FIFO" else Wrr(limit1,limit2,limit3) if service_policy == "WRR" else NPPS(limit1,limit2,limit3)
+        self.queue = Fifo(limit1, limit2, limit3) if service_policy == "FIFO" else Wrr(limit1, limit2,
+                                                                                       limit3) if service_policy == "WRR" else NPPS(
+            limit1, limit2, limit3)
         self.service_p = service_policy
         self.event_table = event_table
         self.y = y
@@ -57,17 +60,21 @@ class Router:
         miner = 1000
 
         while (time <= self.simulation_time):
-            print("min_time_of_processors", min_time_of_processors)
-            print("min_arrive", min_arrive)
-            print("queue", self.queue.buffer)
+            # print("min_time_of_processors", min_time_of_processors)
+            # print("min_arrive", min_arrive)
+            # print("queue", self.queue.buffer)
             if processor_availability and self.queue.not_empty():
-                print('processor_availability and process_availability')
-                print(time)
+                # print('processor_availability and process_availability')
+                # print(time)
                 for processor in processors:
                     if self.queue.not_empty():
                         if not processor.is_busy:
                             process_from_queue = self.queue.call()
-                            processor.packet =process_from_queue
+                            if process_from_queue == None:
+                                continue
+                            # print("*******")
+                            # print(process_from_queue)
+                            processor.packet = process_from_queue
                             processor.is_busy = True
                             processor.to_busy = time + process_from_queue.service_time
                             process_from_queue.is_done = True
@@ -81,8 +88,8 @@ class Router:
                         processor_availability = True
                 min_time_of_processors = miner
             elif min_arrive < min_time_of_processors:
-                print('min_arrive < min_time_of_processors')
-                print(time)
+                # print('min_arrive < min_time_of_processors')
+                # print(time)
                 for processor in processors:
                     if not processor.is_busy:
                         processor.free_time = processor.free_time + (min_arrive - time)
@@ -100,9 +107,9 @@ class Router:
                 else:
                     self.queue.add(self.event_table[i])
                 time = min_arrive
-                min_arrive = self.event_table[i+1].created_at
-                i = i+1
-                miner= 1000
+                min_arrive = self.event_table[i + 1].created_at
+                i = i + 1
+                miner = 1000
                 processor_availability = False
                 for processor in processors:
                     if (processor.to_busy < miner) and processor.is_busy:
@@ -111,8 +118,8 @@ class Router:
                         processor_availability = True
                 min_time_of_processors = miner
             else:
-                print('else')
-                print(time)
+                # print('else')
+                # print(time)
                 for processor in processors:
                     if not processor.is_busy:
                         processor.free_time = processor.free_time + (min_time_of_processors - time)
@@ -134,13 +141,12 @@ class Router:
         time = self.simulation_time
         self.queue.update_mean_size(self.simulation_time)
         self.queue.calculate_averege(self.simulation_time)
-        for i in range(int(time)*3):
+        for i in range(int(time) * 3):
             try:
                 a = self.queue.call()
                 a.queue_time = time - a.created_at
             except Exception:
                 break
-
 
         if self.service_p == "FIFO":
             print("averge count of the queue is :")
@@ -155,9 +161,6 @@ class Router:
         else:
             print("averge count of the queue is :")
             print(self.queue.averege_count)
-
-
-
 
 
 class Queue:
@@ -198,17 +201,16 @@ class Fifo(Queue):
         return self.buffer.popleft()
 
     def update_mean_size(self, time):
-        self.meaner = self.meaner + ((time - self.q_time)*len(self.buffer))
+        self.meaner = self.meaner + ((time - self.q_time) * len(self.buffer))
         self.q_time = time
 
     def calculate_averege(self, time):
-        self.averege_count = self.meaner/time
+        self.averege_count = self.meaner / time
 
     def not_empty(self):
         if len(self.buffer) != 0:
             return True
         return False
-
 
 
 class NPPS(Queue):
@@ -223,7 +225,7 @@ class NPPS(Queue):
         self.q3 = deque()
 
     def add(self, packet):
-        if (len(self.q1)+len(self.q2)+len(self.q3)) < self.limit:
+        if (len(self.q1) + len(self.q2) + len(self.q3)) < self.limit:
             packet.is_drop = False
             if packet.priority == 1:
                 self.q1.append(packet)
@@ -235,9 +237,9 @@ class NPPS(Queue):
             packet.is_drop = True
 
     def call(self):
-        if len(self.q1)>0:
+        if len(self.q1) > 0:
             return self.q1.popleft()
-        elif len(self.q2)>0:
+        elif len(self.q2) > 0:
             return self.q2.popleft()
         else:
             return self.q3.popleft()
@@ -252,11 +254,11 @@ class NPPS(Queue):
         return False
 
     def update_mean_size(self, time):
-        self.meaner = self.meaner + ((time - self.q_time)*(len(self.q1)+len(self.q2)+len(self.q3)))
+        self.meaner = self.meaner + ((time - self.q_time) * (len(self.q1) + len(self.q2) + len(self.q3)))
         self.q_time = time
 
     def calculate_averege(self, time):
-        self.averege_count = self.meaner/time
+        self.averege_count = self.meaner / time
 
 
 class Wrr(Queue):
@@ -277,59 +279,67 @@ class Wrr(Queue):
         self.q3 = deque()
         self.which_q = 1
         self.remaining = 3
+        self.dor = 0
 
     def add(self, packet):
         if packet.priority == 1 and len(self.q1) < self.limit1:
-                packet.is_drop = False
-                self.q1.append(packet)
+            packet.is_drop = False
+            self.q1.append(packet)
         elif packet.priority == 2 and len(self.q2) < self.limit2:
-                packet.is_drop = False
-                self.q2.append(packet)
+            packet.is_drop = False
+            self.q2.append(packet)
         elif packet.priority == 3 and len(self.q3) < self.limit3:
-                packet.is_drop = False
-                self.q3.append(packet)
+            packet.is_drop = False
+            self.q3.append(packet)
         else:
-            packet.is_drop=True
+            packet.is_drop = True
 
     def call(self):
-        if self.remaining == 0 :
-          if self.which_q ==1:
-            self.which_q =2
-            self.remaining = 2
-          elif self.which_q ==2:
-            self.which_q =3
-            self.remaining = 1
-          elif self.which_q ==3:
-            self.which_q =1
-            self.remaining = 3
+        if self.dor > 3:
+            return None
+        if self.remaining == 0:
+            if self.which_q == 1:
+                self.which_q = 2
+                self.remaining = 2
+            elif self.which_q == 2:
+                self.which_q = 3
+                self.remaining = 1
+            elif self.which_q == 3:
+                self.which_q = 1
+                self.remaining = 3
 
         if self.which_q == 1:
             if len(self.q1) > 0:
-              self.remaining = self.remaining -1
-              return self.q1.popleft()
+                self.remaining = self.remaining - 1
+                self.dor = 0
+                return self.q1.popleft()
             else:
+                self.dor = self.dor + 1
                 self.which_q = 2
                 self.remaining = 2
-                return self.call
+                return self.call()
 
         elif self.which_q == 2:
             if len(self.q2) > 0:
-              self.remaining = self.remaining -1
-              return self.q2.popleft()
+                self.remaining = self.remaining - 1
+                self.dor = 0
+                return self.q2.popleft()
             else:
+                self.dor = self.dor + 1
                 self.which_q = 3
                 self.remaining = 1
-                return self.call
+                return self.call()
 
         elif self.which_q == 3:
             if len(self.q3) > 0:
-              self.remaining = self.remaining -1
-              return self.q3.popleft()
+                self.remaining = self.remaining - 1
+                self.dor = 0
+                return self.q3.popleft()
             else:
+                self.dor = self.dor + 1
                 self.which_q = 1
                 self.remaining = 3
-                return self.call
-
+                return self.call()
 
     def not_empty(self):
         if len(self.q1) > 0:
@@ -352,12 +362,12 @@ class Wrr(Queue):
         self.averege_count3 = self.meaner3 / time
 
 
-def simulation(PROCESSORS_NUM, SERVICE_POLICY, X, Y, T, limit1,limit2,limit3):
+def simulation(PROCESSORS_NUM, SERVICE_POLICY, X, Y, T, limit1, limit2, limit3):
     event_table = [Event]
-    event_table = host(simulation_time=2*T, x=X, y=Y)
+    event_table = host(simulation_time=2 * T, x=X, y=Y)
 
     router = Router(event_table=event_table, processors_num=PROCESSORS_NUM, service_policy=SERVICE_POLICY, y=Y,
-                    simulation_time=T, limit1= limit1, limit2=limit2, limit3=limit3)
+                    simulation_time=T, limit1=limit1, limit2=limit2, limit3=limit3)
     router.run()
 
     return event_table
@@ -401,7 +411,7 @@ def poisson_generator_by_binomial(lam, M, a, c, x0):
 
 
 def poisson_time_arrival_generator(lam, M, a, c, x0, total_time):
-    exp_gen = exponential_generator(1 / lam, M, a, c, x0)
+    exp_gen = exponential_generator(lam, M, a, c, x0)
     arrival_times = []
     t = 0
     while t < total_time:
@@ -424,6 +434,7 @@ def priority_packet(M, a, c, x0):
         else:
             raise Exception("Not uniform generated")
 
+
 def host(simulation_time, x, y):
     M = 2 ** 31 - 1
     a = 1103515245
@@ -443,14 +454,30 @@ def host(simulation_time, x, y):
         )
         events.append(event)
     return events
+
+
 PROCESSORS_NUM = 1
 SERVICE_POLICY = 'WRR'
-X = 1
+X = 5
 Y = 0.1
-T = 40
-limit1 = 5
-limit2 = 1
-limit3 = 1
-final_event_table = simulation(PROCESSORS_NUM=PROCESSORS_NUM, SERVICE_POLICY=SERVICE_POLICY, X=X, Y=Y, T=T, limit1=limit1,limit2=limit2,limit3=limit3)
-for i in final_event_table:
-    print(i)
+T = 500
+limit1 = 7
+limit2 = 5
+limit3 = 5
+final_event_table = simulation(PROCESSORS_NUM=PROCESSORS_NUM, SERVICE_POLICY=SERVICE_POLICY, X=X, Y=Y, T=T,
+                               limit1=limit1, limit2=limit2, limit3=limit3)
+# for i in final_event_table:
+#    print(i)
+
+
+import matplotlib.pyplot as plt
+
+priority_1_packets = [event for event in final_event_table if event.priority == 1]
+queue_times = [event.queue_time for event in priority_1_packets if event.queue_time is not None]
+queue_times_cdf = [sum([queue_times[i] for i in range(j)]) for j in range(len(queue_times))]
+indexs = [i for i in range(len(queue_times))]
+
+plt.plot(indexs, queue_times_cdf)
+plt.xlabel('index')
+plt.ylabel('queue_times_high')
+plt.show()
