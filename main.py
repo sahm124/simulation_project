@@ -458,26 +458,26 @@ def host(simulation_time, x, y):
 
 PROCESSORS_NUM = 1
 SERVICE_POLICY = 'WRR'
-X = 5
+X = 3
 Y = 0.1
-T = 500
+T = 100
 limit1 = 7
 limit2 = 5
 limit3 = 5
 final_event_table = simulation(PROCESSORS_NUM=PROCESSORS_NUM, SERVICE_POLICY=SERVICE_POLICY, X=X, Y=Y, T=T,
                                limit1=limit1, limit2=limit2, limit3=limit3)
-# for i in final_event_table:
-#    print(i)
+for i in final_event_table:
+   print(i)
 
-
-import matplotlib.pyplot as plt
-
-priority_1_packets = [event for event in final_event_table if event.priority == 1]
-queue_times = [event.queue_time for event in priority_1_packets if event.queue_time is not None]
-queue_times_cdf = [sum([queue_times[i] for i in range(j)]) for j in range(len(queue_times))]
-indexs = [i for i in range(len(queue_times))]
-
-plt.plot(indexs, queue_times_cdf)
-plt.xlabel('index')
-plt.ylabel('queue_times_high')
-plt.show()
+#
+# import matplotlib.pyplot as plt
+#
+# priority_1_packets = [event for event in final_event_table if event.priority == 1]
+# queue_times = [event.queue_time for event in priority_1_packets if event.queue_time is not None]
+# queue_times_cdf = [sum([queue_times[i] for i in range(j)]) for j in range(len(queue_times))]
+# indexs = [i for i in range(len(queue_times))]
+#
+# plt.plot(indexs, queue_times_cdf)
+# plt.xlabel('index')
+# plt.ylabel('queue_times_high')
+# plt.show()
