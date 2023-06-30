@@ -27,9 +27,9 @@ def host1(x, simulation_time) -> [Event]:
 
 class Router:
 
-    def __init__(self, processors_num, service_policy, y, simulation_time, event_table: [Event]):
+    def __init__(self, processors_num, service_policy, y, simulation_time, event_table: [Event],limit):
         self.processors_num = processors_num
-        self.queue = Fifo() if service_policy == "FIFO" else Wrr() if service_policy == "WRR" else NPPS()
+        self.queue = Fifo(limit) if service_policy == "FIFO" else Wrr(limit) if service_policy == "WRR" else NPPS(limit)
         self.event_table = event_table
         self.y = y
         self.simulation_time = simulation_time
@@ -45,24 +45,32 @@ class Router:
 
     def run(self):
         time = 0
-        min_time_of_processors = 0
+        min_time_of_processors = 1000
         processor_availability = True
         process_availability = False
         min_arrive = self.event_table[0].created_at
         i = 0
-        processors = [Processor in range(self.processors_num)]
+        processors = [Processor() for i in range(self.processors_num)]
+        miner = 1000
+
         while (time <= self.simulation_time):
-            if processor_availability and process_availability:
+            print("min_time_of_processors", min_time_of_processors)
+            print("min_arrive", min_arrive)
+            print("queue", self.queue.buffer)
+            if processor_availability and self.queue.not_empty():
+                print('processor_availability and process_availability')
+                print(time)
                 for processor in processors:
-                    if (not processor.is_busy) and (self.queue.not_empty) :
-                        timer = self.queue.timer()
-                        process_from_queue = self.queue.call()
-                        processor.is_busy = True
-                        processor.to_busy = time + timer
-                        process_from_queue.remaining = process_from_queue.remaining - timer
-                        if process_from_queue.remaining == 0:
-                            process_from_queue.is_done = True
-                            process_from_queue.queue_time = time - process_from_queue.created_at
+                    if self.queue.not_empty():
+                        if not processor.is_busy:
+                            timer = self.queue.timer()
+                            process_from_queue = self.queue.call()
+                            processor.is_busy = True
+                            processor.to_busy = time + timer
+                            process_from_queue.remaining = process_from_queue.remaining - timer
+                            if process_from_queue.remaining == 0:
+                                process_from_queue.is_done = True
+                                process_from_queue.queue_time = time - process_from_queue.created_at
                 miner = 1000
                 processor_availability = False
                 for processor in processors:
@@ -72,14 +80,25 @@ class Router:
                         processor_availability = True
                 min_time_of_processors = miner
             elif min_arrive < min_time_of_processors:
+                print('min_arrive < min_time_of_processors')
+                print(time)
                 for processor in processors:
                     if not processor.is_busy:
                         processor.free_time = processor.free_time + (min_arrive - time)
                 self.queue.update_mean_size(min_arrive)
                 self.queue.add(self.event_table[i])
                 time = min_arrive
+                min_arrive = self.event_table[i+1].created_at
                 i = i+1
+                for processor in processors:
+                    if (processor.to_busy < miner) and processor.is_busy:
+                        miner = processor.to_busy
+                    if not processor.is_busy:
+                        processor_availability = True
+                min_time_of_processors = miner
             else:
+                print('else')
+                print(time)
                 for processor in processors:
                     if not processor.is_busy:
                         processor.free_time = processor.free_time + (min_time_of_processors - time)
@@ -90,9 +109,12 @@ class Router:
                 miner = 1000
                 for processor in processors:
                     if processor.is_busy:
-                        if processor.to_busy<miner:
+                        if processor.to_busy < miner:
                             miner = processor.to_busy
+                min_time_of_processors = miner
                 self.queue.update_mean_size(time)
+
+
 
 
 
@@ -104,12 +126,13 @@ class Queue:
     def add(self, packet: Event):
         if len(self.buffer) < self.limit:
             self.buffer.append(packet)
-        packet.is_drop = True
+        else:
+            packet.is_drop = True
 
     def call(self):
         if not self.buffer:
             return None
-        return self.buffer.popleft(), None
+        return self.buffer.popleft()
 
 
 class Fifo(Queue):
@@ -126,17 +149,17 @@ class Fifo(Queue):
     def call(self):
         return super().call()
 
-    def update_mean_size(time):
+    def update_mean_size(self, time):
         self.meaner = self.meaner + ((time - self.q_time)*len(self.buffer))
         self.q_time = time
 
-    def calculate_averege(time):
+    def calculate_averege(self, time):
         self.averege_count = self.meaner/time
 
     def timer(self):
         return self.buffer[0].remaining
 
-    def is_empty(self):
+    def not_empty(self):
         if len(self.buffer) != 0:
             return True
         return False
@@ -179,7 +202,7 @@ class NPPS(Queue):
         else:
             return self.q3[0].remaining
 
-    def is_empty(self):
+    def not_empty(self):
         if len(self.q1) > 0:
             return True
         elif len(self.q2) > 0:
@@ -331,7 +354,7 @@ class Wrr(Queue):
                 else:
                     return 2
 
-    def is_empty(self):
+    def not_empty(self):
         if len(self.q1) > 0:
             return True
         elif len(self.q2) > 0:
@@ -352,14 +375,16 @@ class Wrr(Queue):
         self.averege_count3 = self.meaner3 / time
 
 
-def simulation(PROCESSORS_NUM, SERVICE_POLICY, X, Y, T):
+def simulation(PROCESSORS_NUM, SERVICE_POLICY, X, Y, T, limit):
     event_table = [Event]
-
-    event_table = host1(x=X, simulation_time=T)
+    event_table = host(simulation_time=2*T, x=X, y=Y)
+    print(event_table)
 
     router = Router(event_table=event_table, processors_num=PROCESSORS_NUM, service_policy=SERVICE_POLICY, y=Y,
-                    simulation_time=T)
+                    simulation_time=T, limit= limit)
     router.run()
+    print(event_table)
+    print('done\n')
     print(event_table)
 
 
@@ -434,44 +459,19 @@ def host(simulation_time, x, y):
     service_time_gen = exponential_generator(y=y, M=M, a=a, c=c, x0=x0)
     events = []
     for arrive in arrival_time:
+        service_time = next(service_time_gen)
         event = Event(
             created_at=arrive,
-            service_time=next(service_time_gen),
+            service_time=service_time,
             priority=next(packet_gen),
+            remaining=service_time,
         )
         events.append(event)
     return events
-# gen = exponential_generator(2, 2**31 - 1, 2247445469, 12345, 123456789)
-# for i in range(10):
-#     x = next(gen)
-#     print(x)
-# z =[]
-# gen = CLCG(M=2**31 - 1, a=22474454, c=123456, x0=123456789)
-# print("uniform")
-# for i in range(10):
-#     x = gen.rand()
-#     z.append(x)
-#     print(x)
-#
-# import numpy as np
-#
-# # Generate some sample data
-#
-#
-# # Calculate the variance of the data
-# data_var = np.var(z)
-#
-# # Calculate the expected variance of a uniform distribution with the same range as the data
-# uniform_var = (1/12) * (max(z) - min(z))**2
-#
-# # Check if the ratio of the actual variance to the expected variance is close to 1
-# if abs(data_var / uniform_var - 1) < 0.1:
-#     print("The data is likely from a uniform distribution.")
-# else:
-#     print("The data is not from a uniform distribution.")
-#
-# poisson_gen = poisson_generator(2.5, M=2**31-1, a=1103515245, c=12345, x0=1)
-#
-# for i in range(10):
-#     x = next(poisson_gen)
-#     print(x)
+PROCESSORS_NUM = 1
+SERVICE_POLICY = 'FIFO'
+X = 1
+Y = 0.3
+T = 100
+limit = 3
+simulation(PROCESSORS_NUM=PROCESSORS_NUM, SERVICE_POLICY=SERVICE_POLICY, X=X, Y=Y, T=T, limit =10)
