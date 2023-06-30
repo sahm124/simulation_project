@@ -12,6 +12,7 @@ class Event:
     service_time: float = None
     is_done = False
     remaining: float = None
+    departure_time: float = None
 
 
 @dataclass
@@ -19,6 +20,7 @@ class Processor:
     free_time: float = 0
     is_busy: bool = False
     to_busy: bool = 0
+    packet: Event = None
 
 
 def host1(x, simulation_time) -> [Event]:
@@ -65,6 +67,7 @@ class Router:
                     if self.queue.not_empty():
                         if not processor.is_busy:
                             process_from_queue = self.queue.call()
+                            processor.packet =process_from_queue
                             processor.is_busy = True
                             processor.to_busy = time + process_from_queue.service_time
                             process_from_queue.is_done = True
@@ -84,11 +87,23 @@ class Router:
                     if not processor.is_busy:
                         processor.free_time = processor.free_time + (min_arrive - time)
                 self.queue.update_mean_size(min_arrive)
-                self.queue.add(self.event_table[i])
+                if processor_availability:
+                    for processor in processors:
+                        if not processor.is_busy:
+                            processor.packet = self.event_table[i]
+                            processor.is_busy = True
+                            processor.to_busy = min_arrive + self.event_table[i].service_time
+                            self.event_table[i].is_done = True
+                            self.event_table[i].queue_time = min_arrive - self.event_table[i].created_at
+                            self.event_table[i].is_drop = False
+                            break
+                else:
+                    self.queue.add(self.event_table[i])
                 time = min_arrive
                 min_arrive = self.event_table[i+1].created_at
                 i = i+1
                 miner= 1000
+                processor_availability = False
                 for processor in processors:
                     if (processor.to_busy < miner) and processor.is_busy:
                         miner = processor.to_busy
@@ -104,6 +119,10 @@ class Router:
                 for processor in processors:
                     if processor.to_busy == min_time_of_processors:
                         processor.is_busy = False
+                        processor.packet.departure_time = min_time_of_processors
+                        processor.packet = None
+                    if not processor.is_busy:
+                        processor_availability = True
                 time = min_time_of_processors
                 miner = 1000
                 for processor in processors:
@@ -112,9 +131,16 @@ class Router:
                             miner = processor.to_busy
                 min_time_of_processors = miner
                 self.queue.update_mean_size(time)
-
+        time = self.simulation_time
         self.queue.update_mean_size(self.simulation_time)
         self.queue.calculate_averege(self.simulation_time)
+        for i in range(int(time)*3):
+            try:
+                a = self.queue.call()
+                a.queue_time = time - a.created_at
+            except Exception:
+                break
+
 
         if self.service_p == "FIFO":
             print("averge count of the queue is :")
@@ -161,6 +187,7 @@ class Fifo(Queue):
 
     def add(self, packet):
         if len(self.buffer) < self.limit:
+            packet.is_drop = False
             self.buffer.append(packet)
         else:
             packet.is_drop = True
@@ -197,6 +224,7 @@ class NPPS(Queue):
 
     def add(self, packet):
         if (len(self.q1)+len(self.q2)+len(self.q3)) < self.limit:
+            packet.is_drop = False
             if packet.priority == 1:
                 self.q1.append(packet)
             elif packet.priority == 2:
@@ -251,14 +279,14 @@ class Wrr(Queue):
         self.remaining = 3
 
     def add(self, packet):
-        if packet.priority == 1:
-            if len(self.q1) < self.limit1:
+        if packet.priority == 1 and len(self.q1) < self.limit1:
+                packet.is_drop = False
                 self.q1.append(packet)
-        elif packet.priority == 2:
-            if len(self.q2) < self.limit2:
+        elif packet.priority == 2 and len(self.q2) < self.limit2:
+                packet.is_drop = False
                 self.q2.append(packet)
-        elif packet.priority == 3:
-            if len(self.q3) < self.limit3:
+        elif packet.priority == 3 and len(self.q3) < self.limit3:
+                packet.is_drop = False
                 self.q3.append(packet)
         else:
             packet.is_drop=True
@@ -416,11 +444,11 @@ def host(simulation_time, x, y):
         events.append(event)
     return events
 PROCESSORS_NUM = 1
-SERVICE_POLICY = 'NPPS'
+SERVICE_POLICY = 'WRR'
 X = 1
 Y = 0.1
-T = 10
-limit1 = 0
+T = 40
+limit1 = 5
 limit2 = 1
 limit3 = 1
 final_event_table = simulation(PROCESSORS_NUM=PROCESSORS_NUM, SERVICE_POLICY=SERVICE_POLICY, X=X, Y=Y, T=T, limit1=limit1,limit2=limit2,limit3=limit3)
